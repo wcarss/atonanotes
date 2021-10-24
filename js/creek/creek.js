@@ -70,7 +70,7 @@ class Time {
   constructor() {
     this.ticks = 0;
   }
-  set_ticks = () => this.ticks = performance.now();
+  set_ticks = (ts) => this.ticks = ts;
   get_ticks = () => this.ticks;
 }
 
@@ -308,13 +308,18 @@ class Looper {
     this.data.game_running = running;
     this.time.set_ticks();
 
-    const inner_loop = () => {
+    const inner_loop = (ts) => {
       loops = 0;
 
-      while (this.time.set_ticks() > next_game_tick && loops < max_frame_skip) {
-        this.updater.update();
+      while (this.time.set_ticks(ts) > next_game_tick && loops < max_frame_skip) {
         next_game_tick += skip_ticks;
         loops += 1;
+        const MAX_OUT_OF_DATE = 300; // if more than 300 ms, just skip ahead
+        if (this.time.get_ticks(ts) - next_game_tick > MAX_OUT_OF_DATE) {
+          next_game_tick = this.time.get_ticks();
+          break;
+        }
+        this.updater.update();
       }
 
       if (this.data.break_update_loop === true) {
