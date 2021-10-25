@@ -33,15 +33,27 @@ class Staff {
     this.notes = [];
   }
 
+  getEnabled(d) {
+    const r = [];
+    for (const [k, v] of Object.entries(d)) {
+      console.log('k, v:', k, ',', v);
+      if (v) {
+        r.push(k);
+      }
+    }
+    return r;
+  }
+
   setupNotes() {
     this.clearNotes();
-    this.clef = this.creek.utilities.random_choice(["bass", "treble"]);
-    const numNotes = this.creek.utilities.random_int(5)+5;
-    const denoms = ["w", "h", "q", "e", "s", 't'];
-    const notes = {
-      treble: Object.keys(this.getRange('treble')),
-      bass: Object.keys(this.getRange('bass'))
-    }[this.clef];
+    const clefs = this.getEnabled(this.creek.data.clefs)
+    console.log('clefs:', clefs)
+    this.clef = this.creek.utilities.random_choice(clefs);
+    this.scale = this.creek.utilities.random_choice(this.getEnabled(this.creek.data.scales));
+    const numNotes = this.creek.utilities.random_int(this.creek.data.min_notes)+(this.creek.data.max_notes-this.creek.data.min_notes);
+    const denoms = this.getEnabled(this.creek.data.denoms);
+    console.log('this.clef:', this.clef);
+    const notes = this.getNoteSets(this.clef, this.scale);
 
     for (let i = 0; i < numNotes; i++) {
       this.addNote(this.creek.utilities.random_choice(notes), this.creek.utilities.random_choice(denoms));
@@ -50,8 +62,8 @@ class Staff {
     this.next_note = 0;
   }
 
-  getRange = clef => {
-    const ranges = {
+  getHeightOffsets = clef => {
+    return {
       treble: {
         c4: 10,
         d4: 9,
@@ -81,13 +93,27 @@ class Staff {
         a3: 0,
         b3: -1,
         c4: -2,
-      }
-    };
-    return ranges[clef];
+      },
+    }[clef];
+  };
+
+  getNoteSets = (clef, scale) => {
+    return {
+      treble: {
+        chromatic: ['c4','d4','e4','f4','g4','a4','b4','c5','d5','e5','f5','g5','a5'],
+        lines: ['c4','e4','g4','b4','d5','f5','a5'],
+        spaces: ['d4','f4','a4','c5','e5','g5'],
+      },
+      bass: {
+        chromatic: ['e2','f2','g2','a2','b2','c3','d3','e3','f3','g3','a3','b3','c4'],
+        lines: ['e2','g2','b2','d3','f3','a3','c4'],
+        spaces: ['f2','a2','c3','e3','g3','b3'],
+      },
+    }[clef][scale];
   }
 
   noteHeightOffset = (pitch) => {
-    const offset = this.getRange(this.clef)[pitch]*this.line_spacing/2;
+    const offset = this.getHeightOffsets(this.clef)[pitch]*this.line_spacing/2;
     //console.log(`${pitch} of ${this.clef} staff is offset: ${offset}`);
     return offset;
   };
@@ -313,21 +339,98 @@ class Note {
   }
 }
 
-
-
 window.onload = async () => {
   const creek = new Creek();
   const palette = creek.utilities.random_choice(Palettes);
   const staff = new Staff(palette);
 
+  let settingsDisplayed = false;
+  const settings = document.getElementById("settings");
+  const settingsToggle = document.getElementById("settings_toggle");
+  const clefs = document.getElementById("settings_clefs");
+  const scales = document.getElementById("settings_scales");
+  const denoms = document.getElementById("settings_denoms");
+  const min_notes = document.getElementById("settings_min_notes");
+  const max_notes = document.getElementById("settings_max_notes");
+  const num_levels = document.getElementById("settings_num_levels");
+  
+  const createLabel = (value) => {
+    const span = document.createElement('span');
+    span.innerText = `${value}: `;
+    return span;
+  };
+
+  const addCheckbox = (parent, key, value, callback) => {
+    const parentElem = document.getElementById(parent);
+    const label = createLabel(key);
+    const input = document.createElement('input');
+    input.type = "checkbox";
+    input.checked = value;
+    input.classList.add('setting_checkbox');
+    input.addEventListener("change", callback);
+    const div = document.createElement('div');
+    div.appendChild(label);
+    div.appendChild(input);
+    parentElem.appendChild(div);
+  };
+
+  const addCheckboxes = (settingsArea) => {
+    const settings = creek.data[settingsArea];
+    for (const [key, value] of Object.entries(settings)) {
+      addCheckbox(
+        `settings_${settingsArea}`,
+        key,
+        settings[key],
+        // close over these values for the callback
+        ((settings, key) => () => {
+          settings[key] = !settings[key];
+        })(settings, key)
+      );
+    }
+  }
+
+  const toggleSettings = (e) => {
+    settingsDisplayed = !settingsDisplayed;
+    const settingsContent = document.getElementById("settings_content");
+    const settingsToggle = document.getElementById("settings_toggle");
+    if (!settingsDisplayed) {
+      settingsContent.classList.add("invisible");
+      settingsToggle.innerHTML = "settings +";
+    } else {
+      settingsContent.classList.remove("invisible");
+      settingsToggle.innerHTML = "settings&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;x";
+    }
+  }
+  settingsToggle.addEventListener("click", toggleSettings)
+
   creek.init([]);
   creek.run();
   creek.data.entity_list = [staff];
-  staff.init(creek);
   creek.data.staff = staff;
 
-  const offsets = [-1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
-  
-  setTimeout(() => {
-  }, 50);
+  // config of what to show
+  creek.data.clefs = {
+    treble: true,
+    bass: true
+  };
+  creek.data.denoms = {
+    w: true,
+    h: true,
+    q: true,
+    e: true,
+    s: true,
+    t: true,
+  };
+  creek.data.scales = {
+    chromatic: true,
+    lines: true,
+    spaces: true,
+  };
+  creek.data.min_notes = 5;
+  creek.data.max_notes = 10;
+  creek.data.number_of_levels = 5;
+  staff.init(creek);
+  addCheckboxes('clefs');
+  addCheckboxes('scales');
+  addCheckboxes('denoms');
 };
