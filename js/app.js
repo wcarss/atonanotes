@@ -177,7 +177,7 @@ class Staff {
     if (this.next_note < this.notes.length) {
       const expectedKey = `Key${this.notes[this.next_note].pitch[0].toUpperCase()}`;
       // console.log(`expecting: ${expectedKey}`);
-      if (creek.controls.check_key('Space') || creek.controls.check_key(expectedKey) && creek.utilities.use_throttle('notes')) {
+      if ((creek.controls.check_mouse() || creek.controls.check_key('Space') || creek.controls.check_key(expectedKey)) && creek.utilities.use_throttle('notes')) {
         this.notes[this.next_note].state = "passed";
         this.next_note += 1;
         if (this.next_note < this.notes.length) {
